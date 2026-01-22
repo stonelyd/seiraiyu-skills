@@ -1,32 +1,6 @@
 ---
-name: Auto‑Resolve PR Review Comments
-version: 0.2.0
-description: >-
-  Read **unresolved** pull‑request review threads, group by logical issue, implement fixes
-  with atomic commits per issue, and reply to each comment with the commit that addresses it.
-audience: Claude Code (Developer Agent)
-intent_examples:
-  - "Fix all unresolved PR review comments in PR #5, group by logical issue, create atomic commits, and reply with commit links."
-  - "Address coderabbitai[bot] comments, group related fixes into atomic commits, do not push, and respond to each thread with its commit."
-requirements:
-  - Access to local git repo checked out on a working branch that targets the PR.
-  - GitHub CLI (`gh`) authenticated with write scopes (classic: `repo`; fine‑grained: Pull Requests: read+write, Contents: read+write).
-  - `jq` available for JSON processing.
-config:
-  env:
-    REPO: "owner/repo (e.g., stonelyd/altium-design-review)"
-    PR: "PR number (e.g., 5)"
-    BRANCH: "Name of working branch that the PR uses"
-  tools:
-    - Bash
-    - git
-    - gh
-    - jq
-    - Editor
-safety:
-  - Never force‑push without explicit instruction.
-  - Run tests/lint before committing when available.
-  - Only modify files that are in the PR's branch.
+name: respond-to-coderabbitai
+description: "Resolve PR review comments from CodeRabbit (or any reviewer) with atomic commits and threaded replies"
 ---
 
 ## Purpose
