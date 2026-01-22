@@ -1,5 +1,4 @@
 ---
-name: respond-to-coderabbitai
 description: "Resolve PR review comments from CodeRabbit with atomic commits and threaded replies"
 ---
 
