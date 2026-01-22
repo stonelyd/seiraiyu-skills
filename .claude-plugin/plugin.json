@@ -1,0 +1,12 @@
+{
+  "name": "seiraiyu-skills",
+  "description": "CodeRabbit PR review automation and productivity skills for Claude Code",
+  "version": "1.0.0",
+  "author": {
+    "name": "stonelyd"
+  },
+  "homepage": "https://github.com/stonelyd/seiraiyu-skills",
+  "repository": "https://github.com/stonelyd/seiraiyu-skills",
+  "license": "MIT",
+  "keywords": ["skills", "coderabbit", "pr-review", "automation", "github"]
+}
