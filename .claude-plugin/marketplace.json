@@ -8,7 +8,7 @@
     {
       "name": "seiraiyu-skills",
       "description": "CodeRabbit PR review automation and productivity skills for Claude Code",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "source": "./",
       "author": {
         "name": "stonelyd"
