@@ -73,6 +73,35 @@ Create runbooks, playbooks, and technical documentation that people actually fol
 - `references/decision-tree.md` - Complex if/then flows
 - `references/onboarding-guide.md` - New person ramping up
 
+### neon
+
+Manage Neon serverless Postgres from the CLI. Projects, branches, databases, roles, connection strings.
+
+**Features:**
+- Full command reference for the Neon CLI (`neonctl`)
+- Branch management including reset, restore, schema-diff
+- Connection string generation with pooling, Prisma, and psql support
+- Project lifecycle management
+- IP allowlist and VPC configuration
+- Agent-friendly `--output json` guidance
+
+**Usage:**
+```bash
+# Set context so you don't repeat --project-id
+neon set-context --project-id <id>
+
+# Create a branch
+neon branches create --name dev/feature
+
+# Get connection string
+neon cs dev/feature --pooled
+
+# Schema diff
+neon branches schema-diff main dev/feature
+```
+
+**Requires:** `neon` CLI installed (`npm i -g neonctl`)
+
 ## Attribution
 
 The `mcp-client` and `sop-creator` skills are based on [second-brain-skills](https://github.com/coleam00/second-brain-skills) by Cole Medin.
