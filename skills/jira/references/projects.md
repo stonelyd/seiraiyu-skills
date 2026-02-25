@@ -3,54 +3,86 @@
 ## List projects
 
 ```bash
-jira project list
+acli jira project list
+acli jira project list --paginate --json
+acli jira project list --recent
 ```
 
 ### Options
 
-| Flag | Description |
-|------|-------------|
-| `--type <type>` | Filter by project type (substring match on `projectTypeKey`) |
-| `--category <cat>` | Filter by category name (substring match) |
-
-Output: table with Key, Name, Type, Lead columns.
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| `--recent` | | Last 20 recently viewed | `false` |
+| `--limit` | `-l` | Max projects | `30` |
+| `--paginate` | | Fetch all | `false` |
+| `--json` | | JSON output | `false` |
 
 ## View project details
 
 ```bash
-jira project view PROJ
+acli jira project view --key PROJ
+acli jira project view --key PROJ --json
 ```
 
-Displays: Key, Name, Type, Lead, Description, Category, Components (with descriptions and leads), Versions (with release status and dates), browse URL.
-
-## List components
+## Create a project
 
 ```bash
-jira project components PROJ
+# Clone from existing project
+acli jira project create --from-project EXISTING --key NEWPROJ --name "New Project"
+
+# From JSON template
+acli jira project create --from-json project.json
+
+# Generate template
+acli jira project create --generate-json
 ```
 
-Shows name, description, and component lead for each component.
+### Options
 
-## List versions
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--key` | `-k` | Project key |
+| `--name` | `-n` | Project name |
+| `--description` | `-d` | Description |
+| `--lead-email` | `-l` | Lead user email |
+| `--url` | `-u` | Project URL |
+| `--from-project` | `-f` | Clone from existing (company-managed only) |
+| `--from-json` | `-j` | Create from JSON |
+| `--generate-json` | `-g` | Print JSON template |
+
+## Update a project
 
 ```bash
-jira project versions PROJ
+acli jira project update --project-key PROJ --name "New Name" --lead-email new-lead@co.com
+acli jira project update --project-key PROJ --from-json project.json
 ```
 
-Shows name, status (Released/Archived/Unreleased), description, and release date for each version.
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--project-key` | `-p` | Key of project to update |
+| `--key` | `-k` | New project key |
+| `--name` | `-n` | New name |
+| `--description` | `-d` | New description |
+| `--lead-email` | `-l` | New lead email |
+| `--url` | `-u` | New URL |
+
+## Archive / Restore / Delete
+
+```bash
+acli jira project archive --key PROJ
+acli jira project restore --key PROJ
+acli jira project delete --key PROJ
+```
 
 ## Examples
 
 ```bash
-# Find all software projects
-jira project list --type software
+# List all projects as JSON
+acli jira project list --paginate --json
 
-# View project details before creating issues
-jira project view PROJ
+# Clone a project
+acli jira project create --from-project TEMPLATE --key MYPROJ --name "My Project"
 
-# Check available components for a project
-jira project components PROJ
-
-# Check release versions
-jira project versions PROJ
+# Transfer project lead
+acli jira project update --project-key PROJ --lead-email new-lead@co.com
 ```

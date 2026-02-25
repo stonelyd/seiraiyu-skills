@@ -1,114 +1,134 @@
 ---
 name: jira
 description: >
-  Manage Jira issues, projects, and sprints from the CLI.
-  Use when the user needs to create, search, update, or triage Jira issues,
-  view sprints, manage projects, or automate Jira workflows from the terminal.
-allowed-tools: Bash(jira:*)
+  Manage Jira issues, projects, sprints, and boards using the Atlassian CLI (acli).
+  Use when the user needs to create, search, update, transition, or triage Jira work items,
+  manage projects, view sprints, bulk operations, or automate Jira workflows from the terminal.
+allowed-tools: Bash(acli:*)
 ---
 
-# Jira CLI
+# Jira CLI (acli)
 
-Manage Jira issues, projects, and sprints from the terminal. Non-interactive — designed for automation and CI/CD pipelines.
+Manage Jira Cloud using the official Atlassian CLI. Supports work items, projects, boards, sprints, filters, dashboards, and bulk operations via CSV/JSON.
 
 ## Quick start
 
 ```bash
-# Configure (Bearer auth — token only)
-jira config --server https://your-jira.atlassian.net --token YOUR_TOKEN
+# Authenticate (API token via stdin)
+echo YOUR_TOKEN | acli jira auth login --site mysite.atlassian.net --email user@company.com --token
 
-# Or with Basic auth (email + token)
-jira config --server https://your-jira.atlassian.net \
-  --username your-email@company.com --token YOUR_TOKEN
+# Or authenticate via browser (OAuth)
+acli jira auth login --web
 
-# List your in-progress issues
-jira issue list --assignee currentUser --status "In Progress"
+# Search work items
+acli jira workitem search --jql "project = PROJ AND assignee = currentUser()" --limit 20
 
 # View an issue
-jira issue view PROJ-123
+acli jira workitem view KEY-123
 
-# Create an issue
-jira issue create --project PROJ --type Bug \
-  --summary "Login fails on mobile" --priority High
+# Create a work item
+acli jira workitem create --project PROJ --type Bug --summary "Login fails on mobile"
+
+# Transition status
+acli jira workitem transition --key KEY-123 --status "In Progress"
 
 # Add a comment
-jira issue comment add PROJ-123 "Fixed in commit abc123"
+acli jira workitem comment create --key KEY-123 --body "Fixed in commit abc123"
 
-# Active sprint
-jira sprint active --board 42
+# Find boards and sprints
+acli jira board search --type scrum
+acli jira board list-sprints --id 42 --state active
 ```
 
 ## Commands
 
 | Command | Purpose |
 |---------|---------|
-| `jira config` | Configure server, credentials. `--show`, `--server`, `--username`, `--token`. |
-| `jira config get [key]` | Get config value. |
-| `jira config set <key> <value>` | Set config value. |
-| `jira config unset <key>` | Remove config value. |
-| `jira issue list` | List issues. `--project`, `--assignee`, `--status`, `--type`, `--reporter`, `--priority`, `--created`, `--updated`, `--limit`, `--jql`. |
-| `jira issue view <KEY>` | View issue details. `--format` (terminal/markdown), `--output <file>`. |
-| `jira issue create` | Create issue. `--project`, `--type`, `--summary` (required). `--description`, `--description-file`, `--assignee`, `--priority`. |
-| `jira issue edit <KEY>` | Edit issue. `--summary`, `--description`, `--description-file`, `--assignee`, `--priority`. |
-| `jira issue delete <KEY>` | Delete issue. `-f/--force` required. |
-| `jira issue comment add <KEY> [text]` | Add comment. `--file`, `--internal`. |
-| `jira issue comment list <KEY>` | List comments. `--format` (table/json). |
-| `jira issue comment edit <ID> [text]` | Edit comment. `--file`. |
-| `jira issue comment delete <ID>` | Delete comment. `-f/--force` required. |
-| `jira project list` | List projects. `--type`, `--category`. |
-| `jira project view <KEY>` | Project details with components and versions. |
-| `jira project components <KEY>` | List project components. |
-| `jira project versions <KEY>` | List project versions. |
-| `jira sprint list` | List sprints. `-b/--board`, `-a/--active`, `--state`. |
-| `jira sprint active` | Active sprint shortcut. `-b/--board`. |
-| `jira sprint boards` | List all boards. |
+| **Auth** | |
+| `acli jira auth login` | Authenticate. `--site`, `--email`, `--token` (stdin) or `--web` (OAuth). |
+| `acli jira auth logout` | Remove authentication. |
+| `acli jira auth status` | Check auth state. |
+| `acli jira auth switch` | Switch authenticated account. |
+| **Work Items** | |
+| `acli jira workitem create` | Create issue. `--project`, `--type`, `--summary`, `--description`, `--assignee`, `--label`, `--parent`. |
+| `acli jira workitem create-bulk` | Bulk create. `--from-csv`, `--from-json`. |
+| `acli jira workitem view [key]` | View issue. `--fields`, `--json`, `--web`. |
+| `acli jira workitem search` | Search issues. `--jql`, `--filter`, `--fields`, `--limit`, `--paginate`, `--count`. |
+| `acli jira workitem edit` | Edit issues. `--key`, `--jql`, `--summary`, `--description`, `--assignee`, `--labels`, `--type`. |
+| `acli jira workitem assign` | Assign issues. `--key`, `--jql`, `--assignee` (`@me`, email), `--remove-assignee`. |
+| `acli jira workitem transition` | Change status. `--key`, `--jql`, `--status`. |
+| `acli jira workitem delete` | Delete issues. `--key`, `--jql`, `--yes`. |
+| `acli jira workitem clone` | Duplicate issues. `--key`, `--to-project`, `--to-site`. |
+| `acli jira workitem archive` | Archive issues. `--key`, `--jql`. |
+| `acli jira workitem unarchive` | Restore archived. `--key`. |
+| **Comments** | |
+| `acli jira workitem comment create` | Add comment. `--key`, `--body`, `--body-file`, `--editor`. |
+| `acli jira workitem comment list` | List comments. `--key`, `--limit`, `--order`, `--paginate`. |
+| `acli jira workitem comment update` | Edit comment. `--key`, `--id`, `--body`. |
+| `acli jira workitem comment delete` | Delete comment. `--key`, `--id`. |
+| **Links & Attachments** | |
+| `acli jira workitem link create` | Link issues. `--out`, `--in`, `--type`. |
+| `acli jira workitem link list` | List links. `--key`. |
+| `acli jira workitem link delete` | Delete link. `--id`. |
+| `acli jira workitem attachment list` | List attachments. `--key`. |
+| `acli jira workitem attachment delete` | Delete attachment. `--id`. |
+| **Projects** | |
+| `acli jira project list` | List projects. `--limit`, `--paginate`, `--recent`. |
+| `acli jira project view` | View project. `--key`, `--json`. |
+| `acli jira project create` | Create project. `--key`, `--name`, `--from-project`. |
+| `acli jira project update` | Update project. `--project-key`, `--name`, `--description`, `--lead-email`. |
+| `acli jira project archive` | Archive project. `--key`. |
+| `acli jira project restore` | Restore project. `--key`. |
+| `acli jira project delete` | Delete project. `--key`. |
+| **Boards & Sprints** | |
+| `acli jira board search` | Search boards. `--name`, `--project`, `--type` (scrum/kanban/simple). |
+| `acli jira board list-sprints` | List sprints. `--id` (board), `--state` (active/future/closed). |
+| `acli jira sprint list-workitems` | Sprint issues. `--board`, `--sprint`, `--fields`, `--jql`. |
+| **Filters & Dashboards** | |
+| `acli jira filter search` | Search filters. `--name`, `--owner`. |
+| `acli jira filter list` | List filters. `--my`, `--favourite`. |
+| `acli jira filter change-owner` | Transfer ownership. `--id`, `--owner`. |
+| `acli jira dashboard search` | Search dashboards. `--name`, `--owner`. |
+| **Fields** | |
+| `acli jira field create` | Create custom field. `--name`, `--type`. |
+| `acli jira field delete` | Trash custom field. `--id`. |
 
-## Aliases
+## Output formats
 
-| Full | Alias |
-|------|-------|
-| `jira config` | `jira c` |
-| `jira issue` | `jira i` |
-| `jira issue list` | `jira issue ls` |
-| `jira issue view` | `jira issue show` |
-| `jira issue create` | `jira issue new` |
-| `jira issue edit` | `jira issue update` |
-| `jira issue delete` | `jira issue rm` |
-| `jira project` | `jira p` |
-| `jira project list` | `jira project ls` |
-| `jira project view` | `jira project show` |
-| `jira sprint` | `jira s` |
-| `jira sprint list` | `jira sprint ls` |
+Default is table. Add `--json` or `--csv` to any command for machine-readable output.
+
+```bash
+acli jira workitem search --jql "project = PROJ" --json | jq '.[].key'
+acli jira workitem search --jql "project = PROJ" --csv > issues.csv
+```
+
+## Bulk operations
+
+All bulk commands accept `--key` (comma-separated), `--jql`, `--filter`, `--from-file`, `--from-csv`, `--from-json`. Use `--ignore-errors` to continue on failures, `--yes` to skip confirmation.
+
+```bash
+# Bulk edit via JQL
+acli jira workitem edit --jql "project = PROJ AND status = Open" --assignee user@co.com --yes
+
+# Bulk create from CSV
+acli jira workitem create-bulk --from-csv issues.csv --yes
+
+# Generate JSON template
+acli jira workitem create --generate-json
+```
 
 ## Authentication
 
-**Bearer auth** (recommended): `jira config --server <url> --token <token>`
+**API token**: `echo TOKEN | acli jira auth login --site site.atlassian.net --email user@co.com --token`
 
-**Basic auth**: `jira config --server <url> --username <email> --token <token>`
+**OAuth (browser)**: `acli jira auth login --web`
 
-**Environment variables** (override stored config):
-
-| Variable | Description |
-|----------|-------------|
-| `JIRA_HOST` | Jira domain (auto-prefixed with `https://`) |
-| `JIRA_API_TOKEN` | API token |
-| `JIRA_USERNAME` | Email (optional, for Basic auth) |
-| `JIRA_API_VERSION` | `auto` (default), `2`, or `3` |
-
-Legacy env vars: `JIRA_DOMAIN`, `JIRA_USERNAME`, `JIRA_API_TOKEN`.
+**CI/CD**: Store token as secret, pipe to `--token` flag.
 
 **Get an API token**: https://id.atlassian.com/manage-profile/security/api-tokens
 
-## Global options
-
-All commands accept: `--config <path>`, `--verbose`, `--no-color`.
-
-## API version
-
-Default `auto`: tries v3 first, falls back to v2 on 404/410. Override with `jira config set apiVersion 2`.
-
 ## Detailed guides
 
-- **Issues & Comments** — [references/issues.md](references/issues.md)
+- **Work Items & Comments** — [references/workitems.md](references/workitems.md)
 - **Projects** — [references/projects.md](references/projects.md)
-- **Sprints & Boards** — [references/sprints.md](references/sprints.md)
+- **Boards & Sprints** — [references/boards-sprints.md](references/boards-sprints.md)

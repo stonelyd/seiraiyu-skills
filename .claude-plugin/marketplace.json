@@ -7,8 +7,8 @@
   "plugins": [
     {
       "name": "seiraiyu-skills",
-      "description": "CodeRabbit PR review automation, Jira CLI, Confluence CLI, Neon CLI, and productivity skills for Claude Code",
-      "version": "1.2.0",
+      "description": "CodeRabbit PR review automation, Jira CLI (acli), Neon CLI, and productivity skills for Claude Code",
+      "version": "1.3.0",
       "source": "./",
       "author": {
         "name": "stonelyd"
