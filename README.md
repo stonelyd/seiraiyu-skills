@@ -78,6 +78,70 @@ neon branches schema-diff main dev/feature
 
 **Requires:** `neon` CLI installed (`npm i -g neonctl`)
 
+### jira
+
+Manage Jira projects, boards, sprints, and work items using the Atlassian CLI (acli).
+
+**Features:**
+- Project and board management
+- Sprint lifecycle (create, start, complete)
+- Work item operations (create, update, transition, assign)
+- JQL search for issues
+- Agent-friendly JSON output
+
+**Usage:**
+```bash
+# List projects
+acli jira project list --output json
+
+# Create an issue
+acli jira issue create --project KEY --type Story --summary "Title" --description "Details"
+
+# Search issues
+acli jira issue search --jql "project = KEY AND status = 'In Progress'"
+```
+
+**Requires:** `acli` CLI installed
+
+### e2e-test-agent-browser
+
+Comprehensive E2E browser testing using the Vercel Agent Browser CLI. Launches parallel sub-agents to research the codebase, then tests every user journey with screenshots, database validation, and bug detection.
+
+**Features:**
+- Parallel research phase (app structure, database schema, bug hunting)
+- Full browser automation (click, fill, select, screenshot)
+- Database record validation after each interaction
+- Responsive testing across mobile, tablet, and desktop viewports
+- Automatic issue detection and fixing
+
+**Usage:**
+```
+/seiraiyu-skills:e2e-test-agent-browser
+```
+
+**Requires:** Linux, WSL, or macOS. `agent-browser` CLI installed (`npm i -g agent-browser`)
+
+### e2e-test-playwright-cli
+
+Comprehensive E2E browser testing using the Playwright CLI (@playwright/cli). Same 6-phase structure as agent-browser but with additional capabilities: named sessions, state persistence, tracing, multi-tab support, network monitoring, and device emulation.
+
+**Features:**
+- Parallel research phase (app structure, database schema, bug hunting)
+- Full browser automation with organized command groups (core, navigation, diagnostics, tabs, tracing, state)
+- Named sessions to prevent conflicts
+- State persistence — save/load auth state across journeys
+- Trace recording for debugging failures
+- Network request monitoring for API error detection
+- Device preset emulation for responsive testing
+- Cross-platform support (Linux, macOS, WSL, Windows)
+
+**Usage:**
+```
+/seiraiyu-skills:e2e-test-playwright-cli
+```
+
+**Requires:** `@playwright/cli` installed (`npm i -g @playwright/cli@latest`)
+
 ## Attribution
 
 The `sop-creator` skill is based on [second-brain-skills](https://github.com/coleam00/second-brain-skills) by Cole Medin.
