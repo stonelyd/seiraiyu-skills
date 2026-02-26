@@ -29,30 +29,6 @@ Automatically resolve PR review comments from CodeRabbit (or any reviewer) with 
 /seiraiyu-skills:respond-to-coderabbitai
 ```
 
-### mcp-client
-
-Universal MCP client for connecting to any MCP server with progressive disclosure. Load tool schemas on-demand instead of bloating your context window.
-
-**Features:**
-- Connects to Zapier, GitHub, Sequential Thinking, and any MCP server
-- Supports stdio, SSE, HTTP, and FastMCP transports
-- Auto-detects transport type from config
-- JSON output for easy integration
-
-**Usage:**
-```bash
-# List configured servers
-python .claude/skills/mcp-client/scripts/mcp_client.py servers
-
-# List tools from a server
-python .claude/skills/mcp-client/scripts/mcp_client.py tools zapier
-
-# Call a tool
-python .claude/skills/mcp-client/scripts/mcp_client.py call zapier <tool> '{"arg": "value"}'
-```
-
-**Setup:** Copy `references/example-mcp-config.json` to `references/mcp-config.json` and add your API keys.
-
 ### sop-creator
 
 Create runbooks, playbooks, and technical documentation that people actually follow.
@@ -104,7 +80,7 @@ neon branches schema-diff main dev/feature
 
 ## Attribution
 
-The `mcp-client` and `sop-creator` skills are based on [second-brain-skills](https://github.com/coleam00/second-brain-skills) by Cole Medin.
+The `sop-creator` skill is based on [second-brain-skills](https://github.com/coleam00/second-brain-skills) by Cole Medin.
 
 ## License
 
