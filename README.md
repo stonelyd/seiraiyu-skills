@@ -103,6 +103,39 @@ acli jira issue search --jql "project = KEY AND status = 'In Progress'"
 
 **Requires:** `acli` CLI installed
 
+### obsidian-cli
+
+Control Obsidian vaults from the terminal. The CLI communicates with the running Obsidian desktop app via IPC for link-aware vault operations.
+
+**Features:**
+- Note CRUD with wikilink-style name resolution
+- Property/frontmatter management (type-aware: text, list, number, checkbox, date, tags)
+- Tags, links, backlinks, orphans, and unresolved link analysis
+- Task management (list, toggle, filter by status)
+- Template support (list, read, create notes from templates)
+- Daily notes (create, read, append)
+- Search with context and folder scoping
+- Sync & local history (status, versions, restore)
+- Plugin management (install, enable, disable, reload)
+- Bases (databases), bookmarks, developer tools
+
+**Usage:**
+```bash
+# Read a note
+obsidian read file="Note Name"
+
+# Create with template
+obsidian create name="Title" template="Template Name"
+
+# Search vault
+obsidian search query="term" format=json
+
+# Manage properties
+obsidian property:set name=status value=active file="Note"
+```
+
+**Requires:** Obsidian desktop running. `obsidian` CLI installed.
+
 ### e2e-test-agent-browser
 
 Comprehensive E2E browser testing using the Vercel Agent Browser CLI. Launches parallel sub-agents to research the codebase, then tests every user journey with screenshots, database validation, and bug detection.

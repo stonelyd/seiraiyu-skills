@@ -1,12 +1,12 @@
 {
   "name": "seiraiyu-skills",
-  "description": "CodeRabbit PR review automation, Jira CLI (acli), Neon CLI, SOP creator, E2E browser testing (agent-browser & playwright-cli), and productivity skills for Claude Code",
-  "version": "1.5.0",
+  "description": "CodeRabbit PR review automation, Jira CLI (acli), Neon CLI, Obsidian CLI, SOP creator, E2E browser testing (agent-browser & playwright-cli), and productivity skills for Claude Code",
+  "version": "1.6.0",
   "author": {
     "name": "stonelyd"
   },
   "homepage": "https://github.com/stonelyd/seiraiyu-skills",
   "repository": "https://github.com/stonelyd/seiraiyu-skills",
   "license": "MIT",
-  "keywords": ["skills", "coderabbit", "pr-review", "automation", "github", "neon", "postgres", "database", "jira", "atlassian", "acli", "e2e", "testing", "browser", "playwright", "agent-browser"]
+  "keywords": ["skills", "coderabbit", "pr-review", "automation", "github", "neon", "postgres", "database", "jira", "atlassian", "acli", "obsidian", "vault", "notes", "e2e", "testing", "browser", "playwright", "agent-browser"]
 }
