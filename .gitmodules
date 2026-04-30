@@ -1,3 +1,9 @@
 [submodule "seiraiyu-marketplace"]
 	path = seiraiyu-marketplace
 	url = https://github.com/stonelyd/seiraiyu-marketplace.git
+[submodule "seiraiyu-superwisdom"]
+	path = seiraiyu-superwisdom
+	url = https://github.com/stonelyd/seiraiyu-superwisdom.git
+[submodule "superwisdom-db"]
+	path = superwisdom-db
+	url = https://github.com/stonelyd/superwisdom-db.git
