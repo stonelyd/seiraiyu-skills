@@ -1,0 +1,3 @@
+[submodule "seiraiyu-marketplace"]
+	path = seiraiyu-marketplace
+	url = https://github.com/stonelyd/seiraiyu-marketplace.git
