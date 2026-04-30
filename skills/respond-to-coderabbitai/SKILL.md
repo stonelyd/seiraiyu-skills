@@ -1,13 +1,26 @@
 ---
 name: respond-to-coderabbitai
-description: "Resolve PR review comments from CodeRabbit (or any reviewer) with atomic commits and threaded replies"
+description: Drive a pull request to merge by resolving CodeRabbit (or any reviewer) PR comments with atomic commits and threaded replies, then iterate across multiple review rounds while monitoring CI. Use when the user mentions CodeRabbit, PR review comments, unresolved review threads, or asks to clear/respond to/address review feedback on a pull request, or to land/merge a PR once CI is green.
+allowed-tools: Bash(gh:*) Bash(git:*) Bash(jq:*) Bash(npm:*) Bash(sleep:*) Bash(date:*) Bash(cat:*) Bash(echo:*) Bash(grep:*) Bash(sed:*) Bash(sort:*) Bash(comm:*) Read Edit Write Monitor TaskStop
+compatibility: Requires git, gh CLI (authenticated with repo write scope), jq, and network access to GitHub. The iterative monitoring loop relies on a Monitor-style background-task tool; agents without one should run the polling script as a long-running shell job instead.
+metadata:
+  author: seiraiyu-skills
+  version: "2.0"
 ---
 
 ## Purpose
 
-Enable Claude Code to **systematically clear unresolved PR review threads**: analyze all threads, group by logical issue, implement atomic fixes, create one commit per logical issue, and **post threaded replies** linking each comment to the commit that addresses it.
+Enable Claude Code to **drive a PR to merge** by clearing all CodeRabbit review threads through however many rounds it takes, monitoring CI continuously, fixing failures, and merging when everything is green.
 
-**Key principle**: Create atomic commits that make sense as standalone changes. Group related comments that address the same underlying issue into a single commit for clean git history.
+**The full lifecycle is iterative.** CodeRabbit typically requires 3–5 rounds of review before it is content. After each round of fixes, CodeRabbit re-reviews and often raises new comments on the new code. The skill:
+
+1. Resolves all current unresolved threads with atomic commits + threaded replies.
+2. Pushes, then **uses the Monitor tool** to watch the PR for new CodeRabbit reviews and CI results.
+3. Repeats round-by-round until CodeRabbit explicitly confirms the review is complete (and an explicit `@coderabbitai` ping is used to ask if needed).
+4. When CI is green AND CodeRabbit has no remaining concerns, merges the PR and pulls the result locally.
+5. If CI fails at any point, fixes the failure as another atomic commit and continues the loop.
+
+**Key principle**: Atomic commits per logical issue. One Monitor task running across rounds. Do not declare done after a single pass — CodeRabbit's first re-review almost always finds something.
 
 ## Use these superpowers
 
@@ -337,12 +350,163 @@ mutation($id:ID!){ resolveReviewThread(input:{threadId:$id}){ thread { id isReso
 
 ---
 
+## Iterative review loop with Monitor
+
+CodeRabbit reviews are not one-shot. After you push fixes, CodeRabbit re-runs and frequently raises **new** comments on the changed code. Plan for **multiple rounds** (3–5 is typical) and use the **Monitor tool** to drive the loop without manual polling.
+
+### When to start the monitor
+
+Start the monitor **after pushing your first round of fix commits**. The monitor should:
+- Watch for new CodeRabbit reviews and unresolved threads on the PR.
+- Watch CI check status (success / failure / pending).
+- Emit a line per state change so you can react.
+
+### Monitor command
+
+Use a single persistent Monitor task that polls the PR every ~30s and emits one line per actionable change. Replace `${REPO}` and `${PR}`:
+
+```bash
+# Save as /tmp/pr_watch.sh, then invoke via the Monitor tool
+REPO="owner/repo"
+PR=123
+prev_unresolved=""
+prev_checks=""
+prev_review_count=""
+
+while true; do
+  # Unresolved threads (count + IDs)
+  unresolved=$(gh api graphql -f query='
+    query($o:String!,$n:String!,$p:Int!){
+      repository(owner:$o,name:$n){
+        pullRequest(number:$p){
+          reviewThreads(first:100){ nodes{ isResolved id comments(first:1){ nodes{ author{login} } } } }
+        }
+      }
+    }' -F o="${REPO%%/*}" -F n="${REPO##*/}" -F p="$PR" 2>/dev/null \
+    | jq -r '.data.repository.pullRequest.reviewThreads.nodes[]
+        | select(.isResolved==false)
+        | select(.comments.nodes[0].author.login=="coderabbitai")
+        | .id' | sort)
+
+  # CodeRabbit review submissions (to detect a new review round)
+  review_count=$(gh api "repos/${REPO}/pulls/${PR}/reviews" --jq \
+    '[.[] | select(.user.login=="coderabbitai[bot]")] | length' 2>/dev/null || echo "0")
+
+  # CI checks
+  checks=$(gh pr checks "$PR" --repo "$REPO" --json name,bucket 2>/dev/null \
+    | jq -r '.[] | "\(.name): \(.bucket)"' | sort)
+
+  # Emit on changes
+  if [ "$unresolved" != "$prev_unresolved" ]; then
+    cnt=$(echo "$unresolved" | grep -c . || true)
+    echo "UNRESOLVED_THREADS: $cnt"
+    prev_unresolved="$unresolved"
+  fi
+  if [ "$review_count" != "$prev_review_count" ] && [ -n "$prev_review_count" ]; then
+    echo "NEW_CODERABBIT_REVIEW: total=$review_count"
+  fi
+  prev_review_count="$review_count"
+
+  if [ "$checks" != "$prev_checks" ]; then
+    echo "CI_STATE_CHANGE:"
+    echo "$checks" | sed 's/^/  /'
+    if echo "$checks" | grep -q ": failure"; then echo "CI_FAILURE_DETECTED"; fi
+    if [ -n "$checks" ] && ! echo "$checks" | grep -qE ": (pending|failure)"; then
+      echo "CI_ALL_GREEN"
+    fi
+    prev_checks="$checks"
+  fi
+
+  sleep 30
+done
+```
+
+Launch with `Monitor` using `persistent: true` and a description like `"PR ${PR} CodeRabbit threads + CI"`. The monitor stays armed across rounds; you do not need to restart it after each push.
+
+### Reacting to monitor events
+
+| Event line | Action |
+|---|---|
+| `UNRESOLVED_THREADS: N` (N>0, increased) | New review round landed. Re-run discovery (step 1), group, fix, commit, reply, push. |
+| `UNRESOLVED_THREADS: 0` | All threads addressed for this round. Proceed to "Confirm review complete". |
+| `NEW_CODERABBIT_REVIEW: total=X` | A fresh review was submitted — expect new comments; re-run discovery. |
+| `CI_FAILURE_DETECTED` | Fetch logs (`gh run view --log-failed`), fix root cause, commit, push. |
+| `CI_ALL_GREEN` + threads at 0 + CodeRabbit confirmed | Proceed to merge. |
+
+### Confirm review is complete with an explicit ping
+
+When unresolved threads hit 0 and you believe you've addressed everything, **post an explicit comment asking CodeRabbit to confirm**, then keep the monitor running for at least one more poll cycle (~60s) to catch any reply or new review:
+
+```bash
+gh pr comment "$PR" --repo "$REPO" --body \
+"@coderabbitai I believe all review comments have been addressed. Could you confirm the review is complete or flag any remaining concerns?"
+```
+
+CodeRabbit responds either with new review comments (loop continues) or with a confirmation. Only treat the review as complete once it explicitly says so or makes no new comments after the ping + one full review cycle.
+
+---
+
+## CI monitoring and failure recovery
+
+The same Monitor task watches CI. On `CI_FAILURE_DETECTED`:
+
+```bash
+# Identify the failing run
+RUN_ID=$(gh run list --repo "$REPO" --branch "$(git branch --show-current)" \
+  --limit 1 --json databaseId,status,conclusion \
+  --jq '.[] | select(.conclusion=="failure") | .databaseId')
+
+# Get failed step logs
+gh run view "$RUN_ID" --repo "$REPO" --log-failed > /tmp/ci_failure.log
+
+# Diagnose, fix, commit as its own atomic commit:
+git add <files>
+git commit -m "fix(ci): <root cause summary>
+
+Addresses CI failure in run ${RUN_ID}."
+git push
+```
+
+Do **not** disable, skip, or `--no-verify` past failing checks. Fix the root cause. The monitor will re-emit `CI_ALL_GREEN` once the next run passes.
+
+---
+
+## Auto-merge when green
+
+Only merge when **all** of the following hold:
+
+1. `UNRESOLVED_THREADS: 0` from the monitor.
+2. `CI_ALL_GREEN` from the monitor (no `pending` or `failure` checks).
+3. CodeRabbit has either explicitly confirmed completion or made no new comments after the explicit `@coderabbitai` ping and a full re-review cycle.
+4. PR is mergeable (`gh pr view ${PR} --json mergeable,mergeStateStatus` shows `MERGEABLE` / `CLEAN`).
+
+Then merge and pull:
+
+```bash
+# Prefer squash unless the repo convention says otherwise
+gh pr merge "$PR" --repo "$REPO" --squash --delete-branch
+
+# Pull the merged result locally
+git checkout main   # or the repo's default branch
+git pull --ff-only
+```
+
+Stop the monitor (`TaskStop`) once the PR is merged.
+
+**Safety guardrails:**
+- Do **not** merge if the user has not authorized merge for this PR. Auto-mode permits the loop but a destructive/shared-state action like merge still needs the user's go-ahead unless they explicitly said "merge when green."
+- Never bypass branch protection (`--admin`) without explicit permission.
+- Never force-push to the PR branch to "fix" a failing check.
+
+---
+
 ## Success criteria
 
-* All previously unresolved threads are either:
-
-  1. replied with a commit link and awaiting reviewer confirmation, or
-  2. acknowledged with a request for CodeRabbit to create a tracking issue, or
-  3. (if allowed) resolved via mutation after successful verification.
-* **All tests pass**: `npm run check`, `npm run test`, and `npm run test:components` (if applicable) all succeed.
-* CI is green; no style/lint regressions; commit messages are clear and traceable.
+* All CodeRabbit review threads across **every round** are either:
+  1. replied with a commit link and resolved (or awaiting reviewer auto-resolve), or
+  2. acknowledged with a request for CodeRabbit to open a tracking issue (impasse path).
+* CodeRabbit has confirmed completion (explicitly, or by silence after the `@coderabbitai` ping + one full review cycle).
+* **All tests pass locally**: `npm run check`, `npm run test`, and `npm run test:components` (if applicable).
+* **CI is fully green** on the latest commit (no pending, no failures).
+* PR is merged and the default branch is pulled locally.
+* Monitor task is stopped.
