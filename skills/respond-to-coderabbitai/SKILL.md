@@ -12,7 +12,19 @@ metadata:
 
 Enable Claude Code to **drive a PR to merge** by clearing all CodeRabbit review threads through however many rounds it takes, monitoring CI continuously, fixing failures, and merging when everything is green.
 
-**The full lifecycle is iterative.** CodeRabbit typically requires 3–5 rounds of review before it is content. After each round of fixes, CodeRabbit re-reviews and often raises new comments on the new code. The skill:
+> ## ⚠️ READ THIS FIRST — DO NOT STOP AFTER ONE PASS
+>
+> **CodeRabbit will almost always go 3–5 rounds of review on a non-trivial PR. Plan for it, budget for it, and do not declare the task complete until CodeRabbit itself has confirmed completion or fallen silent for a full re-review cycle after an explicit `@coderabbitai` ping.**
+>
+> The single most common failure mode of this skill is **stopping too early** — fixing the first batch of comments, pushing, and walking away while CodeRabbit is still re-reviewing. That is **not done**. Each push triggers a fresh review. New comments on the new code are the rule, not the exception. The job is finished when:
+>
+> 1. There are **zero unresolved threads** authored by CodeRabbit, AND
+> 2. CodeRabbit has either explicitly confirmed completion or stayed silent through one full re-review cycle (~5–10 minutes) after you pinged `@coderabbitai`, AND
+> 3. CI is fully green on the latest commit.
+>
+> If any of those three conditions is not met, **the loop is still running**. Keep the Monitor task alive and keep iterating. Do not summarize, do not hand off, do not move on.
+
+**The full lifecycle is iterative.** CodeRabbit typically requires **3–5 rounds** of review before it is content (occasionally more on large PRs). After each round of fixes, CodeRabbit re-reviews and **almost always raises new comments on the new code** — including comments on lines you just changed in response to a previous comment. The skill:
 
 1. Resolves all current unresolved threads with atomic commits + threaded replies.
 2. Pushes, then **uses the Monitor tool** to watch the PR for new CodeRabbit reviews and CI results.
@@ -20,7 +32,12 @@ Enable Claude Code to **drive a PR to merge** by clearing all CodeRabbit review 
 4. When CI is green AND CodeRabbit has no remaining concerns, merges the PR and pulls the result locally.
 5. If CI fails at any point, fixes the failure as another atomic commit and continues the loop.
 
-**Key principle**: Atomic commits per logical issue. One Monitor task running across rounds. Do not declare done after a single pass — CodeRabbit's first re-review almost always finds something.
+**Key principles:**
+- **Atomic commits per logical issue.** One commit per problem, even if it addresses multiple comments.
+- **One Monitor task running across all rounds.** Do not stop and restart it between rounds.
+- **Never declare done after a single pass.** CodeRabbit's first re-review almost always finds something. Plan to iterate 3–5 times.
+- **Every comment must be addressed** — either with a fix + threaded reply linking the commit, or with an explicit acknowledgement and an `@coderabbitai please open a GitHub issue` deferral. No silent skips.
+- **Silence ≠ done.** "No new events for 30 seconds" is not a completion signal; only an explicit CodeRabbit confirmation, or silence after a deliberate ping, counts.
 
 ## Use these superpowers
 
@@ -352,7 +369,11 @@ mutation($id:ID!){ resolveReviewThread(input:{threadId:$id}){ thread { id isReso
 
 ## Iterative review loop with Monitor
 
-CodeRabbit reviews are not one-shot. After you push fixes, CodeRabbit re-runs and frequently raises **new** comments on the changed code. Plan for **multiple rounds** (3–5 is typical) and use the **Monitor tool** to drive the loop without manual polling.
+**This is the heart of the skill. Read it carefully.**
+
+CodeRabbit reviews are **never** one-shot on a non-trivial PR. After you push fixes, CodeRabbit re-runs within a minute or two and frequently raises **new** comments — sometimes on the very lines you just edited, sometimes on adjacent code it didn't flag the first time, sometimes nitpicks that only surfaced after the bigger issues were fixed. **Expect 3–5 rounds.** Treating the first round as the last round is the #1 way this skill fails.
+
+Use the **Monitor tool** to drive the loop without manual polling. The Monitor stays armed across **every** round; do not stop it until the PR is merged.
 
 ### When to start the monitor
 
