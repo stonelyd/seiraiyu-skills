@@ -8,7 +8,7 @@
     {
       "name": "seiraiyu-skills",
       "description": "CodeRabbit PR review automation, Jira CLI (acli), Neon CLI, SOP creator, E2E browser testing (agent-browser & playwright-cli), and productivity skills for Claude Code",
-      "version": "1.7.1",
+      "version": "1.7.2",
       "source": "./",
       "author": {
         "name": "stonelyd"

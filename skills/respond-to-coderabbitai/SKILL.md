@@ -1,43 +1,56 @@
 ---
 name: respond-to-coderabbitai
-description: Drive a pull request to merge by resolving CodeRabbit (or any reviewer) PR comments with atomic commits and threaded replies, then iterate across multiple review rounds while monitoring CI. Use when the user mentions CodeRabbit, PR review comments, unresolved review threads, or asks to clear/respond to/address review feedback on a pull request, or to land/merge a PR once CI is green.
+description: Drive a pull request to merge by resolving CodeRabbit (or any reviewer) PR comments with atomic commits and threaded replies, then iterate across multiple review rounds while a background Monitor tracks both new CodeRabbit comments and CI status. Use when the user mentions CodeRabbit, PR review comments, unresolved review threads, or asks to clear/respond to/address review feedback on a pull request, or to land/merge a PR once CI is green. CodeRabbit typically requires 3-5+ review rounds — never declare done after one pass.
 allowed-tools: Bash(gh:*) Bash(git:*) Bash(jq:*) Bash(npm:*) Bash(sleep:*) Bash(date:*) Bash(cat:*) Bash(echo:*) Bash(grep:*) Bash(sed:*) Bash(sort:*) Bash(comm:*) Read Edit Write Monitor TaskStop
-compatibility: Requires git, gh CLI (authenticated with repo write scope), jq, and network access to GitHub. The iterative monitoring loop relies on a Monitor-style background-task tool; agents without one should run the polling script as a long-running shell job instead.
+compatibility: Requires git, gh CLI (authenticated with repo write scope), jq, and network access to GitHub. **A Monitor-style background-task tool is mandatory** — the iterative review loop and CI-green gating both depend on it. Without one, the skill cannot reliably tell when CodeRabbit has re-reviewed or when CI has settled. If your harness has no Monitor tool, run the polling script as a long-running shell job and tail its output between actions.
 metadata:
   author: seiraiyu-skills
-  version: "2.0"
+  version: "2.1"
 ---
 
 ## Purpose
 
-Enable Claude Code to **drive a PR to merge** by clearing all CodeRabbit review threads through however many rounds it takes, monitoring CI continuously, fixing failures, and merging when everything is green.
+Enable Claude Code to **drive a PR to merge** by clearing all CodeRabbit review threads through however many rounds it takes, with a **persistent Monitor** continuously watching for new CodeRabbit comments AND CI status, fixing failures as they appear, and merging only when everything is green AND CodeRabbit is satisfied.
 
-> ## ⚠️ READ THIS FIRST — DO NOT STOP AFTER ONE PASS
+> ## ⚠️ READ THIS FIRST — CODERABBIT TAKES MANY ROUNDS
 >
-> **CodeRabbit will almost always go 3–5 rounds of review on a non-trivial PR. Plan for it, budget for it, and do not declare the task complete until CodeRabbit itself has confirmed completion or fallen silent for a full re-review cycle after an explicit `@coderabbitai` ping.**
+> **A non-trivial PR will go through 3–5 rounds of CodeRabbit review at minimum. Large or sensitive PRs routinely take 6–10 rounds. This is normal. Plan for it, budget for it, and do not declare the task complete until CodeRabbit itself has confirmed completion or fallen silent for a full re-review cycle after an explicit `@coderabbitai` ping.**
 >
-> The single most common failure mode of this skill is **stopping too early** — fixing the first batch of comments, pushing, and walking away while CodeRabbit is still re-reviewing. That is **not done**. Each push triggers a fresh review. New comments on the new code are the rule, not the exception. The job is finished when:
+> **Each push triggers a fresh review.** CodeRabbit re-runs within ~1–2 minutes of every push and **almost always raises new comments on the new code** — including comments on the exact lines you just changed in response to a previous comment. Nitpicks, edge cases, and adjacent-code concerns that didn't surface in round 1 routinely appear in rounds 2, 3, 4, and beyond.
 >
-> 1. There are **zero unresolved threads** authored by CodeRabbit, AND
-> 2. CodeRabbit has either explicitly confirmed completion or stayed silent through one full re-review cycle (~5–10 minutes) after you pinged `@coderabbitai`, AND
-> 3. CI is fully green on the latest commit.
+> The single most common failure mode of this skill is **stopping too early** — fixing the first batch of comments, pushing, and walking away while CodeRabbit is still re-reviewing. That is **not done**. The job is finished only when ALL THREE of these hold simultaneously on the latest commit:
 >
-> If any of those three conditions is not met, **the loop is still running**. Keep the Monitor task alive and keep iterating. Do not summarize, do not hand off, do not move on.
+> 1. There are **zero unresolved threads** authored by CodeRabbit on the PR, AND
+> 2. CodeRabbit has either explicitly confirmed completion OR stayed silent through one full re-review cycle (~5–10 minutes) after you pinged `@coderabbitai`, AND
+> 3. **CI is fully green** (no `pending`, no `failure`, no `cancelled`) — confirmed by the Monitor emitting `CI_ALL_GREEN`, not by a one-shot `gh pr checks` snapshot.
+>
+> If any of those three conditions is not met, **the loop is still running**. Keep the Monitor task alive and keep iterating. Do not summarize, do not hand off, do not move on. "I addressed everything in round 1" is not a completion claim — it is a round-1 status update.
+>
+> ## ⚠️ THE MONITOR IS MANDATORY
+>
+> You **must** launch the Monitor task (see "Iterative review loop with Monitor" below) immediately after your first push of fix commits, and keep it running until the PR is merged. The Monitor is the only reliable signal for:
+> - When CodeRabbit has finished a new review round (new comments / new review submission)
+> - When CI transitions from `pending` → `success` or `pending` → `failure`
+>
+> Polling manually with `gh pr checks` once and assuming the state is stable is a known failure mode — CI runs are queued, restarted, and re-checked over minutes. The Monitor catches every transition; a one-shot check does not.
 
-**The full lifecycle is iterative.** CodeRabbit typically requires **3–5 rounds** of review before it is content (occasionally more on large PRs). After each round of fixes, CodeRabbit re-reviews and **almost always raises new comments on the new code** — including comments on lines you just changed in response to a previous comment. The skill:
+**The full lifecycle is iterative and Monitor-driven.** CodeRabbit typically requires **3–5 rounds** of review before it is content, and **6–10+ rounds is not unusual** on large or sensitive PRs. After each round of fixes, CodeRabbit re-reviews within 1–2 minutes and **almost always raises new comments on the new code** — including comments on lines you just changed in response to a previous comment. The skill:
 
 1. Resolves all current unresolved threads with atomic commits + threaded replies.
-2. Pushes, then **uses the Monitor tool** to watch the PR for new CodeRabbit reviews and CI results.
-3. Repeats round-by-round until CodeRabbit explicitly confirms the review is complete (and an explicit `@coderabbitai` ping is used to ask if needed).
-4. When CI is green AND CodeRabbit has no remaining concerns, merges the PR and pulls the result locally.
-5. If CI fails at any point, fixes the failure as another atomic commit and continues the loop.
+2. Pushes, then **immediately launches a persistent Monitor task** to watch the PR for new CodeRabbit reviews AND CI results. The Monitor stays armed for the entire lifecycle — do not stop it between rounds.
+3. Reacts to each Monitor event (new review, new unresolved threads, CI failure, CI green) by running another round of fixes — or by pinging `@coderabbitai` for explicit confirmation when threads hit zero.
+4. Merges only when the Monitor has emitted `CI_ALL_GREEN` AND threads are at zero AND CodeRabbit has confirmed (or fallen silent post-ping).
+5. If CI fails at any point during the loop, fixes the root cause as another atomic commit and lets the Monitor confirm the next run goes green. Never bypass with `--no-verify` or `--admin`.
 
 **Key principles:**
+- **Plan for 3–5+ rounds from the start.** Mentally budget the time and tokens for multiple iterations. Treating round 1 as the only round is the #1 failure mode of this skill.
+- **One persistent Monitor task across all rounds.** Launch it after your first push; never stop and restart it between rounds. It tracks both CodeRabbit activity and CI in one place.
+- **CI-green is a Monitor signal, not a snapshot.** Only treat CI as green when the Monitor emits `CI_ALL_GREEN`. A one-shot `gh pr checks` reading can miss queued runs, re-runs, and required checks that haven't started yet.
 - **Atomic commits per logical issue.** One commit per problem, even if it addresses multiple comments.
-- **One Monitor task running across all rounds.** Do not stop and restart it between rounds.
-- **Never declare done after a single pass.** CodeRabbit's first re-review almost always finds something. Plan to iterate 3–5 times.
+- **Never declare done after a single pass.** CodeRabbit's first re-review almost always finds something. If you find yourself thinking "I addressed everything, we're done" after round 1, you are wrong — re-read the warning box above.
 - **Every comment must be addressed** — either with a fix + threaded reply linking the commit, or with an explicit acknowledgement and an `@coderabbitai please open a GitHub issue` deferral. No silent skips.
-- **Silence ≠ done.** "No new events for 30 seconds" is not a completion signal; only an explicit CodeRabbit confirmation, or silence after a deliberate ping, counts.
+- **Silence ≠ done.** "No new events for 30 seconds" is not a completion signal; only an explicit CodeRabbit confirmation, or silence for a full re-review cycle (~5–10 min) after a deliberate `@coderabbitai` ping, counts.
+- **The Monitor is teardown-last.** The Monitor is the last thing you stop, after the merge succeeds and you've pulled the result locally. If you stop it earlier, you can miss a late-arriving review or a CI re-run.
 
 ## Use these superpowers
 
@@ -369,18 +382,24 @@ mutation($id:ID!){ resolveReviewThread(input:{threadId:$id}){ thread { id isReso
 
 ## Iterative review loop with Monitor
 
-**This is the heart of the skill. Read it carefully.**
+**This is the heart of the skill. Read it carefully. The Monitor is mandatory.**
 
-CodeRabbit reviews are **never** one-shot on a non-trivial PR. After you push fixes, CodeRabbit re-runs within a minute or two and frequently raises **new** comments — sometimes on the very lines you just edited, sometimes on adjacent code it didn't flag the first time, sometimes nitpicks that only surfaced after the bigger issues were fixed. **Expect 3–5 rounds.** Treating the first round as the last round is the #1 way this skill fails.
+CodeRabbit reviews are **never** one-shot on a non-trivial PR. After you push fixes, CodeRabbit re-runs within a minute or two and frequently raises **new** comments — sometimes on the very lines you just edited, sometimes on adjacent code it didn't flag the first time, sometimes nitpicks that only surfaced after the bigger issues were fixed. **Expect 3–5 rounds, and budget for more.** Treating the first round as the last round is the #1 way this skill fails.
 
-Use the **Monitor tool** to drive the loop without manual polling. The Monitor stays armed across **every** round; do not stop it until the PR is merged.
+Use the **Monitor tool** to drive the loop without manual polling. The Monitor is the only reliable way to:
+- Detect that CodeRabbit has finished a new round (new comments / new review submission)
+- Detect that CI has transitioned (pending → success/failure, or a re-run was queued)
+
+**The Monitor stays armed across every round; do not stop it until after the PR is merged.** Polling manually with `gh pr checks` or `gh pr view` once is a known failure mode — you will miss queued runs, late reviews, and re-checks.
 
 ### When to start the monitor
 
-Start the monitor **after pushing your first round of fix commits**. The monitor should:
+Start the monitor **immediately after pushing your first round of fix commits — before you do anything else, including before re-reading comments**. The monitor should:
 - Watch for new CodeRabbit reviews and unresolved threads on the PR.
 - Watch CI check status (success / failure / pending).
 - Emit a line per state change so you can react.
+
+If you find yourself about to take ANY post-push action without a Monitor running, stop and launch it first.
 
 ### Monitor command
 
@@ -494,12 +513,14 @@ Do **not** disable, skip, or `--no-verify` past failing checks. Fix the root cau
 
 ## Auto-merge when green
 
-Only merge when **all** of the following hold:
+Only merge when **all** of the following hold — and each must be confirmed by a fresh Monitor event, not a one-shot snapshot:
 
-1. `UNRESOLVED_THREADS: 0` from the monitor.
-2. `CI_ALL_GREEN` from the monitor (no `pending` or `failure` checks).
-3. CodeRabbit has either explicitly confirmed completion or made no new comments after the explicit `@coderabbitai` ping and a full re-review cycle.
+1. **`UNRESOLVED_THREADS: 0`** emitted by the Monitor on its most recent poll.
+2. **`CI_ALL_GREEN`** emitted by the Monitor on its most recent poll (no `pending`, `failure`, or `cancelled` checks). A `gh pr checks` snapshot alone is not sufficient — required checks may be queued but not yet started, which a snapshot can misread as green.
+3. CodeRabbit has either explicitly confirmed completion in a reply OR made no new comments after the explicit `@coderabbitai` ping and a full re-review cycle (~5–10 minutes of Monitor silence on `NEW_CODERABBIT_REVIEW` and `UNRESOLVED_THREADS`).
 4. PR is mergeable (`gh pr view ${PR} --json mergeable,mergeStateStatus` shows `MERGEABLE` / `CLEAN`).
+
+If any of these is unconfirmed, **the loop is still running** — return to the appropriate step (re-discover threads, fix CI, or ping CodeRabbit) and keep the Monitor armed.
 
 Then merge and pull:
 
