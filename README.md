@@ -175,6 +175,25 @@ Comprehensive E2E browser testing using the Playwright CLI (@playwright/cli). Sa
 
 **Requires:** `@playwright/cli` installed (`npm i -g @playwright/cli@latest`)
 
+### handoff
+
+Compact the current conversation into a self-contained handoff document so a fresh agent (or a future you) can resume the work without re-reading the whole session.
+
+**Features:**
+- Writes to the OS temp directory (never the workspace) with a timestamped, descriptive filename
+- References durable artifacts (PRDs, plans, ADRs, issues, PRs, commits) by path/URL instead of duplicating them
+- Captures decisions + rationale, blockers, dead ends, and the exact next action
+- Records git state and the commands needed to resume
+- Redacts secrets and PII
+- Includes a "Suggested skills" section for the next agent
+- Optional argument tailors the doc to what the next session will focus on
+
+**Usage:**
+```
+/seiraiyu-skills:handoff
+/seiraiyu-skills:handoff wire up the Redis store for the rate limiter
+```
+
 ## Attribution
 
 The `sop-creator` skill is based on [second-brain-skills](https://github.com/coleam00/second-brain-skills) by Cole Medin.
