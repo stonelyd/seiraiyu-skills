@@ -55,7 +55,7 @@ If installation fails, stop with:
 
 ## Phase 1: Parallel Research
 
-Launch **three sub-agents simultaneously** using the Task tool. All three run in parallel.
+Launch **three sub-agents simultaneously** using the Agent tool (send all three in one message so they run in parallel).
 
 ### Sub-agent 1: Application Structure & User Journeys
 

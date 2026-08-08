@@ -14,7 +14,8 @@ Manage Jira Cloud using the official Atlassian CLI. Supports work items, project
 ## Quick start
 
 ```bash
-# Authenticate (API token via stdin)
+# Authenticate (API token via stdin — create one at
+# https://id.atlassian.com/manage-profile/security/api-tokens)
 echo YOUR_TOKEN | acli jira auth login --site mysite.atlassian.net --email user@company.com --token
 
 # Or authenticate via browser (OAuth)
@@ -116,16 +117,6 @@ acli jira workitem create-bulk --from-csv issues.csv --yes
 # Generate JSON template
 acli jira workitem create --generate-json
 ```
-
-## Authentication
-
-**API token**: `echo TOKEN | acli jira auth login --site site.atlassian.net --email user@co.com --token`
-
-**OAuth (browser)**: `acli jira auth login --web`
-
-**CI/CD**: Store token as secret, pipe to `--token` flag.
-
-**Get an API token**: https://id.atlassian.com/manage-profile/security/api-tokens
 
 ## Detailed guides
 

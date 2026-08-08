@@ -11,7 +11,7 @@ argument-hint: "What will the next session focus on? (optional)"
 allowed-tools: Bash(date:*) Bash(mktemp:*) Bash(printenv:*) Bash(uname:*) Bash(git:*) Read Write
 metadata:
   author: seiraiyu-skills
-  version: "1.0"
+  version: "2.0"
 ---
 
 # Handoff
@@ -20,15 +20,24 @@ Turn the live conversation into a **handoff document**: everything the next agen
 needs to continue, and nothing it can find for itself. Optimize for a cold start —
 assume the reader has zero memory of this session.
 
-## Definition of Done
+## Two non-negotiable rules
 
-This is complete when:
-- [ ] A handoff doc is written to the OS temp directory (never the workspace)
-- [ ] The reader could resume work from the doc alone, without this transcript
-- [ ] Durable artifacts (PRDs, plans, ADRs, issues, commits, diffs) are **referenced by path/URL**, not copied
-- [ ] A "Suggested skills" section names the skills the next agent should invoke
-- [ ] Secrets and PII are redacted
-- [ ] The final message presents a **paste-ready resume prompt** (`/clear` then paste) naming the doc's **absolute path**
+These are the two ways this skill fails in practice. Both are absolute:
+
+1. **The file goes in the OS temp directory. It NEVER goes in the workspace.**
+   Not `docs/`, not the project root, not a `handoff/` folder, not anywhere inside
+   the repository — no exceptions, and never `git add` it. A handoff is session
+   scratch, not a project artifact; writing it into the repo pollutes the working
+   tree and may land in the wrong repo entirely. If at any point a handoff file
+   exists inside the workspace (including one you just wrote by mistake), delete
+   it and rewrite it to the temp directory before continuing.
+
+2. **Your turn ends with the paste-ready pickup prompt — every time.**
+   Writing the file is NOT completion. The skill is complete only when the last
+   thing in your final message is the fenced pickup block from the "Final message
+   format" section below, containing the doc's absolute path. If you are about to
+   end your turn and that block is not the last thing you wrote, the handoff is
+   unfinished — write it now.
 
 ## Step 1 — Anchor the focus
 
@@ -38,10 +47,7 @@ bias every section toward it (the relevant files, the open question, the next ac
 If they didn't, infer the most likely continuation from the recent turns and state
 your assumption in one line at the top so the reader can correct it.
 
-## Step 2 — Pick the destination
-
-Write to the **OS temp directory**, not the current workspace (the next agent may be
-in a different repo, branch, or worktree). Resolve it in this order:
+## Step 2 — Resolve the temp path
 
 ```bash
 # Cross-platform temp dir + collision-proof, descriptive filename
@@ -50,17 +56,15 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 FILE="$DIR/handoff-<slug>-$STAMP.md"   # <slug> = 2-4 word kebab-case topic
 ```
 
-- macOS / Linux / WSL: `$TMPDIR` then `/tmp`.
-- Windows shells: `%TEMP%` / `$env:TEMP`.
-- Use a descriptive slug (e.g. `handoff-auth-rate-limit-20260608-141030.md`) so the
-  user can find it later among other temp files.
+macOS/Linux/WSL resolves to `$TMPDIR` or `/tmp`; Windows shells use `%TEMP%`.
+Use a descriptive slug (e.g. `handoff-auth-rate-limit-20260608-141030.md`) so the
+user can find it among other temp files. Before writing, confirm the resolved path
+is outside the workspace — if it somehow isn't, use `/tmp` directly.
 
 ## Step 3 — Write the document
 
 Use the template in [references/handoff-template.md](references/handoff-template.md).
 Fill every section; delete a heading only if it is genuinely empty.
-
-Guiding rules:
 
 | Do | Don't |
 |----|-------|
@@ -75,52 +79,44 @@ Keep it scannable — headers, bullets, tables. A handoff nobody reads is worthl
 
 ## Step 4 — Redact
 
-Before saving, scrub:
-- API keys, tokens, passwords, connection strings, `.env` values → `[REDACTED]`
-- Personally identifiable information not needed to continue the work
-- Internal hostnames / private URLs only if sensitive (keep ticket/PR URLs — they're the point)
-
-When in doubt, redact the value but keep the **name** so the reader knows a secret is needed there (e.g. `DATABASE_URL=[REDACTED — in 1Password/Neon]`).
+Before saving, scrub API keys, tokens, passwords, connection strings, and `.env`
+values, plus PII not needed to continue the work. Keep ticket/PR URLs — they're the
+point. When in doubt, redact the value but keep the **name** so the reader knows a
+secret is needed there (e.g. `DATABASE_URL=[REDACTED — in 1Password/Neon]`).
 
 ## Step 5 — Suggested skills
 
-Always include a **Suggested skills** section listing skills the next agent should
-invoke, each with a one-line why and (if known) the trigger phrase. Draw from the
-skills available in the target environment. Common picks:
+Include a **Suggested skills** section listing skills the next agent should invoke,
+each with a one-line why. Draw from the skills available in the target environment
+(e.g. `respond-to-coderabbitai` for an open PR, `jira` for ticket updates, `neon`
+for database branches). Only suggest skills that plausibly apply — an irrelevant
+list erodes trust.
 
-- `respond-to-coderabbitai` — if a PR is open and awaiting review resolution
-- `jira` — if work is tracked in Jira and the ticket needs updating/transitioning
-- `neon` — if the work touches a Neon database branch
-- `sop-creator` — if the outcome should be documented as a runbook
-- `verify` / `code-review` — before claiming the resumed work is done
+## Step 6 — Final message format (mandatory)
 
-Only suggest skills that plausibly apply — an irrelevant list erodes trust.
+After the file is written, your final message MUST follow this exact shape and MUST
+be the last thing in your turn — no trailing commentary after the fenced block:
 
-## Step 6 — Present the resume prompt
-
-The whole point is to start fresh. After writing the doc, present a **paste-ready
-prompt** the user can run in a clean context — mirroring how `/plan` ends. Use the
-actual file path; the user copies one block after clearing.
+1. One line: `Handoff written: <absolute path>`
+2. 1-3 sentences summarizing what the doc covers.
+3. The literal line: `To continue with a clean context, run /clear then paste:`
+4. A fenced code block the user can copy verbatim, following this pattern:
 
 ```
-Handoff written: /tmp/handoff-auth-rate-limit-20260608-141030.md
-Covers: rate-limit middleware half-built on branch `feat/rate-limit`; next step is
-wiring the Redis store (TODO at src/middleware/rateLimit.ts:42). PR #214 open.
-
-To continue with a clean context, run `/clear` then paste:
-
-Read the handoff at /tmp/handoff-auth-rate-limit-20260608-141030.md and resume the
-work. Start with the "single most important next action", and invoke any skills
-listed under "Suggested skills".
+Read the handoff at <absolute path> and resume the work. Start with the
+"single most important next action", and invoke any skills listed under
+"Suggested skills".
 ```
 
-Keep the pasted block self-contained: it must name the absolute path and tell the
-fresh agent to start from the doc — that agent has no memory of this session.
+The fenced block must name the **absolute path** and be fully self-contained — the
+fresh agent has no memory of this session. Do not paraphrase the block away, do not
+merely mention that the user "can resume later", and do not end the turn without it.
 
 ## Anti-patterns
 
 - **Dumping the transcript** — a handoff is a synthesis, not a log.
 - **Copying content that already lives somewhere durable** — link to it.
-- **Writing into the workspace** — pollutes the repo and may be in the wrong one.
+- **Writing into the workspace** — see rule 1. Delete and relocate if it happened.
+- **Ending without the pickup block** — see rule 2. The prompt IS the deliverable.
 - **Vague next steps** — the single most important line is "do this next."
 - **Forgetting git state** — the next agent needs branch, dirty files, unpushed work.
