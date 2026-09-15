@@ -7,8 +7,8 @@
   "plugins": [
     {
       "name": "seiraiyu-skills",
-      "description": "CodeRabbit PR review automation, Jira CLI (acli), Neon CLI, SOP creator, conversation handoff docs, E2E browser testing (agent-browser & playwright-cli), and productivity skills for Claude Code",
-      "version": "1.9.0",
+      "description": "CodeRabbit PR review automation, Jira CLI (acli), Neon CLI, SOP creator, conversation handoff docs, E2E browser testing (agent-browser & playwright-cli), desktop screen driving, and productivity skills for Claude Code",
+      "version": "1.10.0",
       "source": "./",
       "author": {
         "name": "stonelyd"
